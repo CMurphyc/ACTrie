@@ -1,5 +1,6 @@
 local Lplus = require "Lplus"
 local Deque = require "Deque"
+local Utility = require "Utility"
 local ACTrie = Lplus.Class("ACTrie")
 local def = ACTrie.define
 
@@ -46,13 +47,13 @@ end
 
 def.method().BuildTree = function(self)
     if self.trie then
-        local Utility = require "Utility"
-        print(_G.tableToString(self.trie))
+        -- 设置根节点的fail
+        self.fail[0] = nil
         local deque = Deque.new()
         for k, v in pairs(self.trie[0]) do
             Deque.PushBack(deque, v)
+            self.fail[v] = 0
         end
-        local Utility = require "Utility"
         while Deque.Count(deque) > 0 do
             local front = Deque.PopFront(deque)
             if front and self.trie[front] then
@@ -64,14 +65,27 @@ def.method().BuildTree = function(self)
                         self.trie[self.fail[front]] = {}
                     end
                     if not self.trie[self.fail[front]][ch] then
-                        self.trie[self.fail[front]][ch] = 0
+                        local currentFail = self.fail[front]
+                        local currentID = nil
+                        while true do
+                            currentFail = self.fail[currentFail]
+                            if currentFail then
+                                if self.trie[currentFail] then
+                                    currentID = self.trie[currentFail][ch]
+                                    if currentID then
+                                        self.fail[nodeID] = currentID
+                                        break
+                                    end
+                                end
+                            else
+                                -- 指向根节点
+                                self.fail[nodeID] = 0
+                                break
+                            end
+                        end
+                    else
+                        self.fail[nodeID] = self.trie[self.fail[front]][ch]
                     end
-                    self.fail[nodeID] = self.trie[self.fail[front]][ch]
-                    if nodeID == 6 then
-                        self.fail[nodeID] = 7
-                    end
-                    print("czh test front ch ", front, ch, self.fail[front])
-                    print("czh test build fail", nodeID, self.trie[self.fail[front]][ch])
                     Deque.PushBack(deque, nodeID)
                 end
             end
@@ -84,23 +98,21 @@ def.method("string", "=>", "number").QueryCount = function(self, qs)
     local ans = 0
     local divideS = ACTrie.GetDivideStringList(qs)
     local len = #divideS
-    print("czh test fail ", tableToString(self.fail))
     for i = 1, len do
-        u = self.trie[u][divideS[i]] or 0
-        while u ~= 0 do
-            if not self.val[u] then
-                self.val[u] = 0
+        if not self.trie[u] or not self.trie[u][divideS[i]] then
+            if not self.trie[u] then self.trie[u] = {} end
+            self.trie[u][divideS[i]] = self.trie[self.fail[u]][divideS[i]]
+        end
+        u = self.trie[u][divideS[i]]
+        local nodeID = u
+        while nodeID and nodeID ~= 0 do
+            if not self.val[nodeID] then
+                self.val[nodeID] = 0
             end
-            self.val[u] = self.val[u] + 1
-            if not self.fail[u] then
-                self.fail[u] = 0
-            end
-            u = self.fail[u]
+            self.val[nodeID] = self.val[nodeID] + 1
+            nodeID = self.fail[nodeID]
         end
     end
-    print("czh test idx ", tableToString(self.idx))
-    print("czh test val ", tableToString(self.val))
-    print("czh test tot ", self.tot)
     for i = 0, self.tot do
         if self.idx[i] then
             if not self.val[i] then
@@ -111,6 +123,35 @@ def.method("string", "=>", "number").QueryCount = function(self, qs)
         end
     end
     return ans
+end
+
+def.method("string", "=>", "table").QueryBlockedWordsIndexList = function(self, sourceStr)
+    local divideChars = ACTrie.GetDivideStringList(sourceStr)
+    local len = #divideChars
+    local blockedIndexList = {}
+    local oneMatchedStrIndexList = {}
+    local u = 0
+    for i = 1, len do
+        while not self.trie[u][divideChars[i]] and self.fail[u] do
+            u = self.fail[u]
+            if not self.fail[u] then
+                oneMatchedStrIndexList = {}
+            end
+        end
+        u = self.trie[u][divideChars[i]]
+        if not u or u == 0 then
+            u = 0
+        else
+            table.insert(oneMatchedStrIndexList, i)
+        end
+        if self.idx[u] then
+            for k, v in pairs(oneMatchedStrIndexList) do
+                table.insert(blockedIndexList, v)
+            end
+            oneMatchedStrIndexList = {}
+        end
+    end
+    return blockedIndexList
 end
 
 def.static("string", "=>", "table").GetDivideStringList = function(sourceString)
