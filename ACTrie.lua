@@ -7,8 +7,7 @@ local def = ACTrie.define
 def.field("table").trie = nil
 def.field("table").fail = nil
 def.field("table").idx = nil
-def.field("table").val = nil
-def.field("table").cnt = nil
+def.field("table").depth = nil
 def.field("number").tot = 0
 
 def.static("=>", ACTrie).CreateACTrie = function()
@@ -21,8 +20,7 @@ def.method().Init = function(self)
     self.trie = {}
     self.fail = {}
     self.idx = {}
-    self.val = {}
-    self.cnt = {}
+    self.depth = {}
     self.tot = 0
 end
 
@@ -31,6 +29,7 @@ def.method("string", "number").Insert = function(self, sourceStr, id)
         local u = 0
         local divideStr = ACTrie.GetDivideStringList(sourceStr)
         local len = #divideStr
+        self.depth[u] = 0
         for i = 1, len do
             if not self.trie[u] or not self.trie[u][divideStr[i]] then
                 if not self.trie[u] then
@@ -40,6 +39,7 @@ def.method("string", "number").Insert = function(self, sourceStr, id)
                 self.trie[u][divideStr[i]] = self.tot
             end
             u = self.trie[u][divideStr[i]]
+            self.depth[u] = i
         end
         self.idx[u] = id
     end
@@ -66,14 +66,15 @@ def.method().BuildTree = function(self)
                     end
                     if not self.trie[self.fail[front]][ch] then
                         local currentFail = self.fail[front]
-                        local currentID = nil
+                        local failNodeChID = nil
+                        -- 构造fail
                         while true do
                             currentFail = self.fail[currentFail]
                             if currentFail then
                                 if self.trie[currentFail] then
-                                    currentID = self.trie[currentFail][ch]
-                                    if currentID then
-                                        self.fail[nodeID] = currentID
+                                    failNodeChID = self.trie[currentFail][ch]
+                                    if failNodeChID then
+                                        self.fail[nodeID] = failNodeChID
                                         break
                                     end
                                 end
@@ -93,86 +94,75 @@ def.method().BuildTree = function(self)
     end
 end
 
-def.method("string", "=>", "number").QueryCount = function(self, qs)
-    local u = 0
-    local ans = 0
-    local divideS = ACTrie.GetDivideStringList(qs)
-    local len = #divideS
+def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceStr)
+    local divideChars = ACTrie.GetDivideStringList(sourceStr)
+    local ans = ""
+    local len = #divideChars
+    local nodeID = 0
+    local matchStartPos = {}
+    local matchEndPos = {}
     for i = 1, len do
-        if not self.trie[u] or not self.trie[u][divideS[i]] then
-            if not self.trie[u] then self.trie[u] = {} end
-            self.trie[u][divideS[i]] = self.trie[self.fail[u]][divideS[i]]
-        end
-        u = self.trie[u][divideS[i]]
-        local nodeID = u
-        while nodeID and nodeID ~= 0 do
-            if not self.val[nodeID] then
-                self.val[nodeID] = 0
-            end
-            self.val[nodeID] = self.val[nodeID] + 1
+        while nodeID ~= 0 and (not self.trie[nodeID] or not self.trie[nodeID][divideChars[i]]) do
             nodeID = self.fail[nodeID]
         end
-    end
-    for i = 0, self.tot do
-        if self.idx[i] then
-            if not self.val[i] then
-                self.val[i] = 0
+        nodeID = self.trie[nodeID] and self.trie[nodeID][divideChars[i]] or 0
+        local checkNodeID = nodeID
+        local startPos = 0
+        while checkNodeID and checkNodeID ~= 0 do
+            if self.idx[checkNodeID] then
+                if not matchEndPos[i] then
+                    matchEndPos[i] = 1
+                else
+                    matchEndPos[i] = matchEndPos[i] + 1
+                end
+                startPos = i - self.depth[checkNodeID] + 1
+                if not matchStartPos[startPos] then
+                    matchStartPos[startPos] = 1
+                else
+                    matchStartPos[startPos] = matchStartPos[startPos] + 1
+                end
             end
-            ans = math.max(ans, self.val[i])
-            self.cnt[self.idx[i]] = self.val[i] or 0
+            checkNodeID = self.fail[checkNodeID]
         end
     end
-    return ans
-end
-
-def.method("string", "=>", "table").QueryBlockedWordsIndexList = function(self, sourceStr)
-    local divideChars = ACTrie.GetDivideStringList(sourceStr)
-    local len = #divideChars
-    local blockedIndexList = {}
-    local oneMatchedStrIndexList = {}
-    local u = 0
+    local stackDepth = 0
     for i = 1, len do
-        while not self.trie[u][divideChars[i]] and self.fail[u] do
-            u = self.fail[u]
-            if not self.fail[u] then
-                oneMatchedStrIndexList = {}
-            end
+        if matchStartPos[i] then
+            stackDepth = stackDepth + matchStartPos[i]
         end
-        u = self.trie[u][divideChars[i]]
-        if not u or u == 0 then
-            u = 0
-        else
-            table.insert(oneMatchedStrIndexList, i)
+        if stackDepth > 0 then
+            divideChars[i] = "*"
         end
-        if self.idx[u] then
-            for k, v in pairs(oneMatchedStrIndexList) do
-                table.insert(blockedIndexList, v)
-            end
-            oneMatchedStrIndexList = {}
+        if matchEndPos[i] then
+            stackDepth = stackDepth - matchEndPos[i]
         end
     end
-    return blockedIndexList
+    ans = table.concat(divideChars)
+    return ans
 end
 
 def.static("string", "=>", "table").GetDivideStringList = function(sourceString)
 	local divideList = {}
-	while sourceString do
-		local utf8 = string.byte(sourceString, 1)
-		if not utf8 then
-			break
-		end
-		if utf8 > 127 then
-			local ch = string.sub(sourceString, 1, 3)
-			table.insert(divideList, ch)
-			sourceString = string.sub(sourceString, 4)
-		else
-			local ch = string.sub(sourceString, 1, 1)
-			table.insert(divideList, ch)
-			sourceString = string.sub(sourceString, 2)
-		end
-	end
-	return divideList
+    local len  = string.len(sourceString)
+    local stPos = 1
+    local utf8Sign  = {0xc0, 0xe0, 0xf0, 0xf8, 0xfc}
+    while stPos <= len do
+        local sign = string.byte(sourceString, stPos)
+        local chLen = 1
+        for i = 1, 6 do
+            if sign < utf8Sign[i] then
+                chLen = i
+                break
+            end
+        end
+        local ch = string.sub(sourceString, stPos, stPos + chLen - 1)
+        stPos = stPos + chLen
+        table.insert(divideList, ch)
+    end
+    return divideList
 end
 
+
 ACTrie.Commit()
+_G.ACTrie = ACTrie
 return ACTrie

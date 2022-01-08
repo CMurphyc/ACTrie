@@ -60,22 +60,23 @@ end
 
 def.static("string", "=>", "table").GetDivideStringList = function(sourceString)
 	local divideList = {}
-	while sourceString do
-		local utf8 = string.byte(sourceString, 1)
-		if not utf8 then
-			break
-		end
-		if utf8 > 127 then
-			local ch = string.sub(sourceString, 1, 3)
-			table.insert(divideList, ch)
-			sourceString = string.sub(sourceString, 4)
-		else
-			local ch = string.sub(sourceString, 1, 1)
-			table.insert(divideList, ch)
-			sourceString = string.sub(sourceString, 2)
-		end
-	end
-	return divideList
+    local len  = string.len(sourceString)
+    local stPos = 1
+    local utf8Sign  = {0xc0, 0xe0, 0xf0, 0xf8, 0xfc}
+    while stPos <= len do
+        local sign = string.byte(sourceString, stPos)
+        local chLen = 1
+        for i = 1, 6 do
+            if sign < utf8Sign[i] then
+                chLen = i
+                break
+            end
+        end
+        local ch = string.sub(sourceString, stPos, stPos + chLen - 1)
+        stPos = stPos + chLen
+        table.insert(divideList, ch)
+    end
+    return divideList
 end
 
 def.method("string", "=>", "boolean").IsContainBlockedWord = function(self, sourceString)
@@ -110,11 +111,11 @@ end
     return ：返回屏蔽字是 '*'的字符串
 ]]
 def.method("string", "=>", "string").GetUnBlockedWord = function(self, sourceString)
-    local currentTime = GetServerMillisecondsTime()
     if --[[not _G.EditorDataUtils.IsNilOrEmpty(sourceString)]] true then
         local strWithoutSpace = string.gsub(sourceString, " ", "")
         local divideCharList = TrieTree.GetDivideStringList(strWithoutSpace)
-        local matchedArray = {} --匹配索引index，匹配字长度 {{index，length}，{index，length}}
+        --匹配索引index，匹配字长度 {{index，length}...}
+        local matchedArray = {}
         local matchPos = 1
         local len = #divideCharList
         local currentNode = self.root
@@ -127,8 +128,7 @@ def.method("string", "=>", "string").GetUnBlockedWord = function(self, sourceStr
                 matchedCharCount = 0
             elseif currentNode.wordEnd then
                 matchedCharCount = matchedCharCount + 1
-                local matchItem = {index = matchPos - matchedCharCount,length = matchedCharCount}
-                --print("------------->matchPArray.insert:"..(matchPos - matchedCharCount)..","..matchedCharCount)
+                local matchItem = {index = matchPos - matchedCharCount, length = matchedCharCount}
                 table.insert(matchedArray, matchItem)
                 currentNode = self.root
                 matchedCharCount = 0
@@ -137,7 +137,6 @@ def.method("string", "=>", "string").GetUnBlockedWord = function(self, sourceStr
             end
             matchPos = matchPos + 1
         end
-
         if #matchedArray > 0 then
             local targetString = ""
             for k, matched in ipairs(matchedArray) do
@@ -151,13 +150,11 @@ def.method("string", "=>", "string").GetUnBlockedWord = function(self, sourceStr
                 end
             end
             targetString = table.concat(divideCharList)
-            --print("-------->final targetString:"..targetString)
             return targetString
         end
     else
         return sourceString
     end
-
     return ""
 end
 
