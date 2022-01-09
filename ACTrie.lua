@@ -27,10 +27,11 @@ end
 def.method("string", "number").Insert = function(self, sourceStr, id)
     if self.trie then
         local u = 0
-        local divideStr = ACTrie.GetDivideStringList(sourceStr)
+        local divideStr = GetDivideStringList(sourceStr)
         local len = #divideStr
         self.depth[u] = 0
         for i = 1, len do
+            divideStr[i] = string.lower(divideStr[i])
             if not self.trie[u] or not self.trie[u][divideStr[i]] then
                 if not self.trie[u] then
                     self.trie[u] = {}
@@ -95,17 +96,20 @@ def.method().BuildTree = function(self)
 end
 
 def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceStr)
-    local divideChars = ACTrie.GetDivideStringList(sourceStr)
+    sourceStr = string.gsub(sourceStr, " ", "")
+    local divideChars = GetDivideStringList(sourceStr)
     local ans = ""
     local len = #divideChars
     local nodeID = 0
     local matchStartPos = {}
     local matchEndPos = {}
+    local currentCh = ""
     for i = 1, len do
-        while nodeID ~= 0 and (not self.trie[nodeID] or not self.trie[nodeID][divideChars[i]]) do
+        currentCh = string.lower(divideChars[i])
+        while nodeID ~= 0 and (not self.trie[nodeID] or not self.trie[nodeID][currentCh]) do
             nodeID = self.fail[nodeID]
         end
-        nodeID = self.trie[nodeID] and self.trie[nodeID][divideChars[i]] or 0
+        nodeID = self.trie[nodeID] and self.trie[nodeID][currentCh] or 0
         local checkNodeID = nodeID
         local startPos = 0
         while checkNodeID and checkNodeID ~= 0 do
@@ -140,28 +144,6 @@ def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceS
     ans = table.concat(divideChars)
     return ans
 end
-
-def.static("string", "=>", "table").GetDivideStringList = function(sourceString)
-	local divideList = {}
-    local len  = string.len(sourceString)
-    local stPos = 1
-    local utf8Sign  = {0xc0, 0xe0, 0xf0, 0xf8, 0xfc}
-    while stPos <= len do
-        local sign = string.byte(sourceString, stPos)
-        local chLen = 1
-        for i = 1, 6 do
-            if sign < utf8Sign[i] then
-                chLen = i
-                break
-            end
-        end
-        local ch = string.sub(sourceString, stPos, stPos + chLen - 1)
-        stPos = stPos + chLen
-        table.insert(divideList, ch)
-    end
-    return divideList
-end
-
 
 ACTrie.Commit()
 _G.ACTrie = ACTrie

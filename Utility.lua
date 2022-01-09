@@ -32,3 +32,24 @@ function _G.tableToString (t)
     ret = ret ..(string.format(")\n"))
     return ret
 end
+
+function _G.GetDivideStringList(sourceString)
+	local divideList = {}
+    local len  = string.len(sourceString)
+    local stPos = 1
+    local utf8Sign  = {0xc0, 0xe0, 0xf0, 0xf8, 0xfc}
+    while stPos <= len do
+        local sign = string.byte(sourceString, stPos)
+        local chLen = 1
+        for i = 1, 6 do
+            if sign < utf8Sign[i] then
+                chLen = i
+                break
+            end
+        end
+        local ch = string.sub(sourceString, stPos, stPos + chLen - 1)
+        stPos = stPos + chLen
+        table.insert(divideList, ch)
+    end
+    return divideList
+end

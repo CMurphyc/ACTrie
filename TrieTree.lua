@@ -22,7 +22,7 @@ end
 def.method("table").UpdateTree = function(self, blockWordList)
     if blockWordList then
         for i, v in pairs(blockWordList) do
-            local divideChars = TrieTree.GetDivideStringList(string.lower(v))
+            local divideChars = GetDivideStringList(string.lower(v))
             if #divideChars > 0 then
                 self:Insert(self.root, divideChars, 1)
             end
@@ -58,31 +58,10 @@ def.method("table", "string", "=>", "table").FindNode = function(self, node, cha
     return nil
 end
 
-def.static("string", "=>", "table").GetDivideStringList = function(sourceString)
-	local divideList = {}
-    local len  = string.len(sourceString)
-    local stPos = 1
-    local utf8Sign  = {0xc0, 0xe0, 0xf0, 0xf8, 0xfc}
-    while stPos <= len do
-        local sign = string.byte(sourceString, stPos)
-        local chLen = 1
-        for i = 1, 6 do
-            if sign < utf8Sign[i] then
-                chLen = i
-                break
-            end
-        end
-        local ch = string.sub(sourceString, stPos, stPos + chLen - 1)
-        stPos = stPos + chLen
-        table.insert(divideList, ch)
-    end
-    return divideList
-end
-
 def.method("string", "=>", "boolean").IsContainBlockedWord = function(self, sourceString)
     if --[[not _G.EditorDataUtils.IsNilOrEmpty(sourceString)]] true then
         local strWithoutSpace = string.gsub(sourceString, " ", "")
-        local divideCharList = TrieTree.GetDivideStringList(strWithoutSpace)
+        local divideCharList = GetDivideStringList(strWithoutSpace)
         local matchPos = 1
         local len = #divideCharList
         local currentNode = self.root
@@ -100,7 +79,6 @@ def.method("string", "=>", "boolean").IsContainBlockedWord = function(self, sour
             end
             matchPos = matchPos + 1
         end
-        
     end
 	return false
 end
@@ -110,10 +88,10 @@ end
     param sourceString：含有屏蔽字的字符串
     return ：返回屏蔽字是 '*'的字符串
 ]]
-def.method("string", "=>", "string").GetUnBlockedWord = function(self, sourceString)
+def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceString)
     if --[[not _G.EditorDataUtils.IsNilOrEmpty(sourceString)]] true then
         local strWithoutSpace = string.gsub(sourceString, " ", "")
-        local divideCharList = TrieTree.GetDivideStringList(strWithoutSpace)
+        local divideCharList = GetDivideStringList(strWithoutSpace)
         --匹配索引index，匹配字长度 {{index，length}...}
         local matchedArray = {}
         local matchPos = 1

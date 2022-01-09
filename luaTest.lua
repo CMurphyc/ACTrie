@@ -6,37 +6,29 @@ _G.block_word_list = {}
 
 local blockWordsFileName = "block_words_data.lua"
 local block_words_data = dofile(blockWordsFileName)
-local testStr = table.concat(block_words_data, "", 20500, 20600)
--- testStr = "我妈妈妈的妈妈门叫我会叫不要玩妈妈们妈妈的爸爸了"
+local reverseWords = dofile(blockWordsFileName)
+for k, v in ipairs(reverseWords) do
+    local s = GetDivideStringList(v)
+    local len = #s
+    local tmp = ""
+    for i = 1, math.modf(len / 2) do
+        tmp = s[i]
+        s[i] = s[len - i + 1]
+        s[len - i + 1] = tmp
+    end
+    table.insert(block_words_data, table.concat(s))
+end
 
-local LibStringSearch = require "string_search"
 
--- 性能测试
-local LibProfiler = require "profiler"
+local testStr = table.concat(block_words_data)
+testStr = "爸爸的爸爸叫爷爷爸爸的妈妈叫奶奶妈妈的妈妈叫外婆外婆也可以叫姥姥"
 
-local newProfiler = LibProfiler()
-
-newProfiler:start()
-
-
-local l_FindClass = LibStringSearch:new(block_words_data)
-newProfiler:stop()
-
-local tbLines, nTime = newProfiler:report()
-
-print("A 构建trie树消耗时间 ", nTime)
-
-newProfiler:start()
-
-local matchStr = l_FindClass:find_all(testStr)
-local result = l_FindClass:replace(matchStr, testStr)
-
-newProfiler:stop()
-local tbLines, nTime = newProfiler:report()
-print("A 敏感词过滤消耗的时间: ", nTime)
+local profiler = require "profiler"
+local newProfiler = profiler()
 
 
 newProfiler:start()
+
 local ACTrie = require "ACTrie".CreateACTrie()
 if block_words_data then
     local len = #block_words_data
@@ -46,22 +38,23 @@ if block_words_data then
 end
 ACTrie:BuildTree()
 
-
 newProfiler:stop()
 
 local tl, edTime = newProfiler:report()
 
-print("B 构建trie树消耗时间 ", edTime)
+print("AC自动机 建树消耗时间 ", edTime)
 
 
 newProfiler:start()
 local acResult = ACTrie:FilterBlockedWords(testStr)
+for i = 1, 1000 do
+    ACTrie:FilterBlockedWords(testStr)
+end
 newProfiler:stop()
 
 local tl, filterTime = newProfiler:report()
 
-print("B 敏感词过滤消耗的时间: ", filterTime)
-
+print("AC自动机敏感词过滤消耗的时间: ", filterTime)
 
 
 newProfiler:start()
@@ -69,54 +62,20 @@ _G.BlockWordTrieTree = _G.TrieTree.CreateTrieTree()
 _G.BlockWordTrieTree:UpdateTree(block_words_data)
 newProfiler:stop()
 local tl, edTime = newProfiler:report()
-print("C 构建trie树消耗时间 ", edTime)
+print("Trie 构建trie树消耗时间 ", edTime)
 
 newProfiler:start()
-local trieResult = _G.BlockWordTrieTree:GetUnBlockedWord(testStr)
+local trieResult = _G.BlockWordTrieTree:FilterBlockedWords(testStr)
+for i = 1, 1000 do
+    _G.BlockWordTrieTree:FilterBlockedWords(testStr)
+end
 newProfiler:stop()
 
 local tl, trieFilterTime = newProfiler:report()
 
-print("C 敏感词过滤消耗的时间: ", trieFilterTime)
-
-
-require("init")
-
-newProfiler:start()
-local worldFilter = require("WordFilter").new("*")
-worldFilter:init(block_words_data)
-
-newProfiler:stop()
-local tl, edTime = newProfiler:report()
-print("D 构建trie树消耗时间 ", edTime)
-
-newProfiler:start()
-local lresult = worldFilter:doFilter(testStr)
-newProfiler:stop()
-
-local tl, trieFilterTime = newProfiler:report()
-
-print("D 敏感词过滤消耗的时间: ", trieFilterTime)
-if acResult == trieResult then
-    print("B == C")
-end
-if acResult == lresult then
-    print("B == D")
-end
-if trieResult == lresult then
-    print("C == D")
-end
-print("A ", result)
-print("B ", acResult)
-print("C ", trieResult)
-print("D ", lresult)
--- print("A is contain ", worldFilter:isFilter(result))
--- print("B is contain ", worldFilter:isFilter(acResult))
--- print("C is contain ", worldFilter:isFilter(trieResult))
--- print("D is contain ", worldFilter:isFilter(lresult))
-
-print("A is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(result))
-print("B is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(acResult))
-print("C is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(trieResult))
-print("D is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(lresult))
+print("Trie 敏感词过滤消耗的时间: ", trieFilterTime)
+print("AC自动机过滤后的文本 ", acResult)
+print("Trie过滤后的文本 ", trieResult)
+-- print("B is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(acResult))
+-- print("C is contain ", _G.BlockWordTrieTree:IsContainBlockedWord(trieResult))
 
