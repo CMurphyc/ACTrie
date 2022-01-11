@@ -97,7 +97,6 @@ def.method().BuildFail = function(self)
 end
 
 def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceStr)
-    sourceStr = string.gsub(sourceStr, " ", "")
     local divideChars = GetDivideStringList(sourceStr)
     local ans = ""
     local len = #divideChars

@@ -81,18 +81,17 @@ def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceS
     if sourceStr ~= nil and sourceStr ~= "" then
         local matchStartPos = {}
         local matchEndPos = {}
-        sourceStr = string.gsub(sourceStr, " ", "")
         local divideStr = GetDivideStringList(sourceStr)
         if divideStr then
             local len = #divideStr
-            for i = 1, len do
-                divideStr[i] = string.lower(divideStr[i])
-            end
+            local currentCh = ""
+            local nextCh = ""
             local nodeID = 0
             local strMatchEndPos = 0
             if self.trie then
                 for i = 1, len do
-                    nodeID = self.trie[0][divideStr[i]] or 0
+                    currentCh = string.lower(divideStr[i])
+                    nodeID = self.trie[0][currentCh] or 0
                     local matchCount = 0
                     while nodeID and nodeID ~= 0 do
                         matchCount = matchCount + 1
@@ -109,8 +108,9 @@ def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceS
                                 matchEndPos[strMatchEndPos] = matchEndPos[strMatchEndPos] + 1
                             end
                         end
-                        if self.trie[nodeID] then
-                            nodeID = self.trie[nodeID][divideStr[i + matchCount]] or 0
+                        if self.trie[nodeID] and divideStr[i + matchCount] then
+                            nextCh = string.lower(divideStr[i + matchCount])
+                            nodeID = self.trie[nodeID][nextCh] or 0
                         else
                             matchCount = 0
                             break
