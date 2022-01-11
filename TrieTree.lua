@@ -3,137 +3,137 @@ local TrieTree = Lplus.Class("TrieTree")
 
 local def = TrieTree.define
 
-def.field("table").root = nil
+def.field("table").trie = nil
+def.field("table").idx = nil
+def.field("table").depth = nil
+def.field("number").tot = 0
 
 def.static("=>", TrieTree).CreateTrieTree = function()
     local tree = TrieTree()
-    tree.root = TrieTree.CreateNode("", false, nil)
+    tree:Init()
     return tree
 end
 
-def.static("string", "boolean", "table", "=>", "table").CreateNode = function(char, isEnd, childs)
-	local node = {}
-	node.char = char or ""
-	node.wordEnd = isEnd or false
-	node.childs = childs or {}
-	return node
+def.method().Init = function(self)
+    self.trie = {}
+    self.idx = {}
+    self.depth = {}
+    self.tot = 0
 end
 
-def.method("table").UpdateTree = function(self, blockWordList)
-    if blockWordList then
-        for i, v in pairs(blockWordList) do
-            local divideChars = GetDivideStringList(string.lower(v))
-            if #divideChars > 0 then
-                self:Insert(self.root, divideChars, 1)
+def.method("string", "number").Insert = function(self, sourceStr, id)
+    if self.trie then
+        sourceStr = string.gsub(sourceStr, " ", "")
+        local divideStr = GetDivideStringList(sourceStr)
+        local len = #divideStr
+        local u = 0
+        self.depth[u] = 0
+        for i = 1, len do
+            divideStr[i] = string.lower(divideStr[i])
+            if not self.trie[u] or not self.trie[u][divideStr[i]] then
+                if not self.trie[u] then
+                    self.trie[u] = {}
+                end
+                self.tot = self.tot + 1
+                self.trie[u][divideStr[i]] = self.tot
             end
+            u = self.trie[u][divideStr[i]]
+            self.depth[u] = i
         end
+        self.idx[u] = id
     end
 end
 
-def.method("table", "table", "number").Insert = function(self, parent, chars, index)
-	local node = self:FindNode(parent, chars[index])
-	if not node then
-		node = TrieTree.CreateNode(chars[index], false, nil)
-        parent.childs[node.char] = node
-	end
-	local len = #chars
-	if index == len then
-		node.wordEnd = true
-	else
-		index = index + 1
-		if index <= len then
-			self:Insert(node, chars, index)
-		end
-	end
-end
-
-def.method("table", "string", "=>", "table").FindNode = function(self, node, char)
-	local childs = node.childs
-    if childs then
-        if --[[not _G.EditorDataUtils.IsNilOrEmpty(char)]] true then
-            local lowerChar = string.lower(char)
-            return childs[lowerChar]
-        end
-    end
-    return nil
-end
-
-def.method("string", "=>", "boolean").IsContainBlockedWord = function(self, sourceString)
-    if --[[not _G.EditorDataUtils.IsNilOrEmpty(sourceString)]] true then
-        local strWithoutSpace = string.gsub(sourceString, " ", "")
-        local divideCharList = GetDivideStringList(strWithoutSpace)
-        local matchPos = 1
-        local len = #divideCharList
-        local currentNode = self.root
-        local matchedCharCount = 0
-        while len >= matchPos do
-            currentNode = self:FindNode(currentNode, divideCharList[matchPos])
-            if not currentNode then
-                matchPos = matchPos - matchedCharCount
-                currentNode = self.root
-                matchedCharCount = 0
-            elseif currentNode.wordEnd then
-                return true
-            else
-                matchedCharCount = matchedCharCount + 1
+def.method("string", "=>", "boolean").IsContainBlockedWord = function(self, sourceStr)
+    if sourceStr ~= nil and sourceStr ~= "" then
+        sourceStr = string.gsub(sourceStr, " ", "")
+        local divideStr = GetDivideStringList(sourceStr)
+        if divideStr then
+            local len = #divideStr
+            for i = 1, len do
+                divideStr[i] = string.lower(divideStr[i])
             end
-            matchPos = matchPos + 1
-        end
-    end
-	return false
-end
-
---[[
-    desc:将屏蔽字替换成'*'号
-    param sourceString：含有屏蔽字的字符串
-    return ：返回屏蔽字是 '*'的字符串
-]]
-def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceString)
-    if --[[not _G.EditorDataUtils.IsNilOrEmpty(sourceString)]] true then
-        local strWithoutSpace = string.gsub(sourceString, " ", "")
-        local divideCharList = GetDivideStringList(strWithoutSpace)
-        --匹配索引index，匹配字长度 {{index，length}...}
-        local matchedArray = {}
-        local matchPos = 1
-        local len = #divideCharList
-        local currentNode = self.root
-        local matchedCharCount = 0
-        while len >= matchPos do
-            currentNode = self:FindNode(currentNode, divideCharList[matchPos])
-            if not currentNode then
-                matchPos = matchPos - matchedCharCount
-                currentNode = self.root
-                matchedCharCount = 0
-            elseif currentNode.wordEnd then
-                matchedCharCount = matchedCharCount + 1
-                local matchItem = {index = matchPos - matchedCharCount, length = matchedCharCount}
-                table.insert(matchedArray, matchItem)
-                currentNode = self.root
-                matchedCharCount = 0
-            else
-                matchedCharCount = matchedCharCount + 1
-            end
-            matchPos = matchPos + 1
-        end
-        if #matchedArray > 0 then
-            local targetString = ""
-            for k, matched in ipairs(matchedArray) do
-                local pos = matched.index
-                local length = matched.length
-                --替换非法字符 
-                for i = 1, length do
-                    if pos + i <= #divideCharList then
-                        divideCharList[pos + i] = "*"
+            local nodeID = 0
+            if self.trie then
+                for i = 1, len do
+                    nodeID = self.trie[0][divideStr[i]]
+                    local matchCount = 0
+                    while nodeID and nodeID ~= 0 do
+                        matchCount = matchCount + 1
+                        if self.idx and self.idx[nodeID] then
+                            return true
+                        end
+                        if self.trie[nodeID] then
+                            nodeID = self.trie[nodeID][divideStr[i + matchCount]] or 0
+                        else
+                            break
+                        end
                     end
                 end
             end
-            targetString = table.concat(divideCharList)
-            return targetString
         end
-    else
-        return sourceString
     end
-    return ""
+    return false
+end
+
+def.method("string", "=>", "string").FilterBlockedWords = function(self, sourceStr)
+    local ans = ""
+    if sourceStr ~= nil and sourceStr ~= "" then
+        local matchStartPos = {}
+        local matchEndPos = {}
+        sourceStr = string.gsub(sourceStr, " ", "")
+        local divideStr = GetDivideStringList(sourceStr)
+        if divideStr then
+            local len = #divideStr
+            for i = 1, len do
+                divideStr[i] = string.lower(divideStr[i])
+            end
+            local nodeID = 0
+            local strMatchEndPos = 0
+            if self.trie then
+                for i = 1, len do
+                    nodeID = self.trie[0][divideStr[i]] or 0
+                    local matchCount = 0
+                    while nodeID and nodeID ~= 0 do
+                        matchCount = matchCount + 1
+                        if self.idx and self.idx[nodeID] then
+                            if not matchStartPos[i] then
+                                matchStartPos[i] = 1
+                            else
+                                matchStartPos[i] = matchStartPos[i] + 1
+                            end
+                            strMatchEndPos = i + self.depth[nodeID] - 1
+                            if not matchEndPos[strMatchEndPos] then
+                                matchEndPos[strMatchEndPos] = 1
+                            else
+                                matchEndPos[strMatchEndPos] = matchEndPos[strMatchEndPos] + 1
+                            end
+                        end
+                        if self.trie[nodeID] then
+                            nodeID = self.trie[nodeID][divideStr[i + matchCount]] or 0
+                        else
+                            matchCount = 0
+                            break
+                        end
+                    end
+                end
+            end
+            local stackDepth = 0
+            for i = 1, len do
+                if matchStartPos[i] then
+                    stackDepth = stackDepth + matchStartPos[i]
+                end
+                if stackDepth > 0 then
+                    divideStr[i] = "*"
+                end
+                if matchEndPos[i] then
+                    stackDepth = stackDepth - matchEndPos[i]
+                end
+            end
+            ans = table.concat(divideStr)
+        end
+    end
+    return ans
 end
 
 TrieTree.Commit()

@@ -27,6 +27,7 @@ end
 def.method("string", "number").Insert = function(self, sourceStr, id)
     if self.trie then
         local u = 0
+        sourceStr = string.gsub(sourceStr, " ", "")
         local divideStr = GetDivideStringList(sourceStr)
         local len = #divideStr
         self.depth[u] = 0
@@ -46,7 +47,7 @@ def.method("string", "number").Insert = function(self, sourceStr, id)
     end
 end
 
-def.method().BuildTree = function(self)
+def.method().BuildFail = function(self)
     if self.trie then
         -- 设置根节点的fail
         self.fail[0] = nil
